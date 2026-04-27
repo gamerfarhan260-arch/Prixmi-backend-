@@ -11,6 +11,9 @@ const db = admin.firestore();
 
 const app = express();
 app.use(cors({ origin: true }));
+App.get('/', (req, res) => {
+    res.send('<h1>Prixmi Backend is LIVE!</h1><p>Server sahi se kaam kar raha hai aur routes active hain.</p>');
+});
 
 // Capture raw body for Cashfree webhook signature verification
 app.use(express.json({
