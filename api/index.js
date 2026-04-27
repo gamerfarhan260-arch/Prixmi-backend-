@@ -346,6 +346,36 @@ app.post('/api/rewards/daily', verifyToken, async (req, res) => {
         res.json({ success: true, amount: 10 });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
+// --- 6.5 Transaction History API ---
+app.get('/api/wallet/history', verifyToken, async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        
+        // Database se transactions fetch karna
+        const snapshot = await db.collection('transactions')
+            .where('userId', '==', uid)
+            .orderBy('timestamp', 'desc') 
+            .get();
+
+        const history = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            history.push({
+                id: doc.id,
+                amount: data.amount || 0,
+                type: data.type || 'Transaction',
+                status: data.status || 'SUCCESS',
+                date: data.timestamp ? data.timestamp.toDate().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'
+            });
+        });
+
+        res.json(history);
+    } catch (e) {
+        console.error("History Error:", e);
+        res.status(500).json({ error: "History load nahi ho saki" });
+    }
+});
+
 
 // 7. Test Route
 app.get('/api', (req, res) => {
