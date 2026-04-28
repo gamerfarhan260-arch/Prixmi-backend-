@@ -1,24 +1,13 @@
 {
-  "name": "prixmi-esports-backend",
+  "name": "esports-backend",
   "version": "1.0.0",
-  "description": "Prixmi Esports Tournament Backend",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
+  "type": "commonjs",
+  "main": "api/index.js",
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "firebase-admin": "^11.11.0",
-    "node-fetch": "^2.7.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "author": "Prixmi Esports",
-  "license": "MIT"
+    "cors": "^2.8.5",
+    "firebase-admin": "^12.0.0",
+    "axios": "^1.6.7",
+    "node-cron": "^3.0.3"
+  }
 }
