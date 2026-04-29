@@ -277,6 +277,48 @@ app.post('/api/wallet/createOrder', verifyToken, async (req, res) => {
         res.json({ payment_session_id: cfRes.data.payment_session_id, order_id: orderId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// 4.5 Wallet - Verify Payment (Frontend se call hoga)
+app.post('/api/wallet/verify', verifyToken, async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        const uid = req.user.uid;
+
+        // 1. Cashfree se real-time status pucho
+        const cfRes = await axios.get(`${CASHFREE_URL}/orders/${orderId}`, {
+            headers: {
+                'x-client-id': process.env.CASHFREE_APP_ID,
+                'x-client-secret': process.env.CASHFREE_SECRET_KEY,
+                'x-api-version': '2022-09-01'
+            }
+        });
+
+        // 2. Agar payment sach mein 'PAID' hai
+        if (cfRes.data.order_status === 'PAID') {
+            const q = await db.collection('transactions').where('orderId', '==', orderId).limit(1).get();
+            
+            // 3. Check karo ki DB mein status PENDING hai kya
+            if (!q.empty && q.docs[0].data().status !== 'SUCCESS') {
+                await db.runTransaction(async (t) => {
+                    const tRef = q.docs[0].ref;
+                    const uRef = db.collection('users').doc(uid);
+                    const uDoc = await t.get(uRef);
+                    
+                    // Wallet balance update karo aur transaction SUCCESS mark karo
+                    t.update(uRef, { wallet: (uDoc.data().wallet || 0) + cfRes.data.order_amount });
+                    t.update(tRef, { status: 'SUCCESS' });
+                });
+                return res.json({ success: true, message: "Balance Updated!" });
+            } else {
+                return res.json({ success: true, message: "Already Verified!" });
+            }
+        } else {
+            return res.status(400).json({ error: "Payment not completed yet" });
+        }
+    } catch (e) {
+        console.error("Verify Error:", e.response?.data || e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // 5. Cashfree Webhook (Auto-Confirm Payment)
 app.post('/api/webhook/cashfree', async (req, res) => {
