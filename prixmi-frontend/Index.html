@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Prixmi Esports · BGMI Tournament Panel | Referral + WhatsApp Share</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#ff1e1e',
+            bg: '#0a0a0a',
+            card: '#111111',
+            surface: '#1a1a1a',
+            muted: '#2a2a2a',
+            'primary-glow': '#ff4d4d',
+            'green-badge': '#00c853',
+            'gray-badge': '#555555',
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+            'slide-up': 'slideUp 0.3s ease-out',
+            'fade-in': 'fadeIn 0.25s ease-out',
+            'shimmer': 'shimmer 1.5s infinite',
+          },
+          keyframes: {
+            glowPulse: {
+              '0%, 100%': { boxShadow: '0 0 10px rgba(255, 30, 30, 0.2)' },
+              '50%': { boxShadow: '0 0 25px rgba(255, 30, 30, 0.5)' },
+            },
+            slideUp: {
+              '0%': { transform: 'translateY(20px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            },
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            shimmer: {
+              '0%': { backgroundPosition: '-200% 0' },
+              '100%': { backgroundPosition: '200% 0' },
+            },
+          },
+        },
+      },
+    }
+  </script>
+
+  <!-- Firebase Compat CDNs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Cashfree SDK v3 -->
+  <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; scrollbar-width: thin; scrollbar-color: #2a2a2a #0a0a0a; }
+    body { background: #0a0a0a; color: #fff; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #0a0a0a; } ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+
+    .glass-subtle { background: rgba(17,17,17,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.04); }
+    .glass-card { background: rgba(20,20,20,0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; }
+    .btn-primary { background: #ff1e1e; color: white; transition: all 0.2s; border: none; }
+    .btn-primary:hover:not(:disabled) { background: #e01616; box-shadow: 0 0 20px rgba(255,30,30,0.35); }
+    .btn-primary:active:not(:disabled) { transform: scale(0.96); }
+    .btn-primary:disabled { background: #3a3a3a; color: #777; cursor: not-allowed; box-shadow: none; transform: none; }
+    .btn-outline { background: transparent; color: white; border: 1.5px solid rgba(255,255,255,0.3); transition: 0.2s; }
+    .btn-outline:hover:not(:disabled) { border-color: #ff1e1e; color: #ff1e1e; }
+
+    .content-section { display: none; }
+    .content-section.active { display: block; animation: fadeIn 0.25s; }
+
+    .nav-item { transition: 0.2s; cursor: pointer; position: relative; }
+    .nav-item.active { color: #ff1e1e; }
+    .nav-item.active::after { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 20px; height: 3px; background: #ff1e1e; border-radius: 2px; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.show { display: flex; }
+    .modal-content { background: #1a1a1a; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 24px; width: 90%; max-width: 400px; animation: slideUp 0.3s ease-out; }
+
+    .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; align-items: flex-end; }
+    .toast { pointer-events: auto; padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: 350px; animation: slideUp 0.3s; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .toast-success { background: #0d2818; border: 1px solid #00c853; color: #00c853; }
+    .toast-error { background: #2e0d0d; border: 1px solid #ff1e1e; color: #ff5252; }
+    .toast-info { background: #0d1a2e; border: 1px solid #448aff; color: #82b1ff; }
+
+    .profile-dropdown { background: #1e1e1e; border-radius: 16px; border: 1px solid #333; position: absolute; top: 55px; right: 16px; width: 280px; z-index: 200; display: none; backdrop-filter: blur(16px); }
+    .profile-dropdown.show { display: block; animation: fadeIn 0.2s; }
+    .referral-code-box { background: #0a0a0a; border-radius: 12px; padding: 8px 12px; font-family: monospace; letter-spacing: 1px; border: 1px solid #00c85340; }
+    
+    /* FAQ premium styling */
+    .faq-category-btn.active {
+      background: #ff1e1e;
+      color: white;
+      border-color: #ff1e1e;
+      box-shadow: 0 0 12px rgba(255,30,30,0.3);
+    }
+    .faq-item {
+      transition: all 0.2s ease;
+    }
+    .faq-question {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .faq-question:hover {
+      background: rgba(255, 30, 30, 0.08);
+    }
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+    }
+    .faq-answer.open {
+      max-height: 300px;
+    }
+    .faq-icon {
+      transition: transform 0.25s ease;
+    }
+    .faq-item.active .faq-icon {
+      transform: rotate(180deg);
+    }
+    .search-highlight {
+      background: rgba(255, 30, 30, 0.25);
+      border-radius: 4px;
+      color: #ff9999;
+    }
+    .auth-tab-btn.active {
+      background: #ff1e1e;
+      color: white;
+      border-color: #ff1e1e;
+    }
+    @media (min-width: 768px) {
+      .app-wrapper { max-width: 480px; margin: 0 auto; border-left: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); min-height: 100vh; }
+    }
+  </style>
+</head>
+<body class="bg-bg">
+
+  <div class="app-wrapper relative min-h-screen">
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- AUTH SCREEN with Separate Tabs -->
+    <div id="auth-screen" class="min-h-screen flex flex-col items-center justify-center px-6">
+      <div class="text-center mb-6">
+        <div class="text-5xl mb-3">⚡</div>
+        <h1 class="text-3xl font-bold tracking-tight">Prixmi Esports</h1>
+        <p class="text-gray-400 text-xs mt-1">India's fastest growing BGMI tournament platform</p>
+      </div>
+      
+      <!-- Auth Tabs -->
+      <div class="w-full max-w-sm flex gap-2 mb-6 bg-surface/50 rounded-xl p-1 border border-white/10">
+        <button id="auth-signup-tab" class="auth-tab-btn active flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all bg-primary text-white">📝 Sign Up</button>
+        <button id="auth-login-tab" class="auth-tab-btn flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all text-gray-400 hover:text-white">🔐 Login</button>
+      </div>
+      
+      <!-- Signup Form -->
+      <div id="signup-form-container" class="w-full max-w-sm space-y-3">
+        <input type="email" id="signup-email" placeholder="Email address" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none" autocomplete="email">
+        <input type="password" id="signup-password" placeholder="Password (min 6 characters)" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none" autocomplete="new-password">
+        <input type="text" id="signup-bgmi-id" placeholder="BGMI User ID *" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none">
+        <input type="text" id="signup-referral" placeholder="Referral Code (Optional)" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none">
+        <button id="signup-submit-btn" class="btn-primary w-full py-3 rounded-lg font-semibold text-sm">Create Account</button>
+        <p class="text-center text-[10px] text-gray-500">*BGMI User ID is required for tournament participation</p>
+      </div>
+      
+      <!-- Login Form (Hidden by default) -->
+      <div id="login-form-container" class="w-full max-w-sm space-y-3 hidden">
+        <input type="email" id="login-email" placeholder="Email address" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none" autocomplete="email">
+        <input type="password" id="login-password" placeholder="Password" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none" autocomplete="current-password">
+        <button id="login-submit-btn" class="btn-primary w-full py-3 rounded-lg font-semibold text-sm">Login</button>
+        <p class="text-center text-xs text-gray-500">New user? <button id="switch-to-signup" class="text-primary">Create an account</button></p>
+      </div>
+      
+      <p id="auth-error" class="text-red-400 text-xs text-center hidden mt-3"></p>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="main-app" class="hidden flex flex-col min-h-screen">
+
+      <header class="glass-subtle sticky top-0 z-50 px-5 py-3 flex items-center justify-between border-b border-white/5 relative">
+        <div class="flex items-center gap-2">
+          <span class="text-xl font-bold tracking-tight">Prixmi</span>
+          <span class="text-primary text-xs bg-primary/10 px-2 py-0.5 rounded-full">ESports</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-sm font-semibold bg-[#1a1a1a] px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5">
+            <span class="text-gray-400 text-xs">₹</span>
+            <span id="balance-display-top">0</span>
+          </div>
+          <button id="profile-btn" class="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm">👤</button>
+        </div>
+        <!-- Profile Dropdown -->
+        <div id="profile-dropdown" class="profile-dropdown glass-card p-4 space-y-3">
+          <div class="flex items-center gap-3 border-b border-white/10 pb-3">
+            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg" id="dropdown-avatar">U</div>
+            <div class="flex-1">
+              <p class="font-semibold text-sm" id="profile-email">user@example.com</p>
+              <p class="text-[10px] text-gray-400" id="profile-bgmi-id">BGMI ID: Not set</p>
+            </div>
+          </div>
+          <div class="bg-[#0a0a0a] rounded-xl p-3 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-gray-300 text-xs font-medium">🔗 Your Referral Code</span>
+              <div class="flex items-center gap-2">
+                <span id="referral-code-display" class="referral-code-box text-primary text-sm font-bold px-3 py-1">XXXXX</span>
+                <button id="copy-referral-code-btn" class="text-[10px] bg-primary/20 hover:bg-primary/40 text-white px-2 py-1 rounded-full transition">📋 Copy</button>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-300 text-xs">👥 Total Referrals</span>
+              <span id="total-referrals-count" class="text-white font-bold text-lg">0</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-300 text-xs">💰 Referral Earnings</span>
+              <span class="text-green-400 font-bold text-lg">₹<span id="referral-earnings">0</span></span>
+            </div>
+            <button id="whatsapp-invite-btn" class="btn-primary w-full py-2.5 text-sm rounded-xl font-semibold flex items-center justify-center gap-2 mt-2">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.611-.916-2.206-.242-.579-.488-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              Invite on WhatsApp
+            </button>
+          </div>
+          <button id="logout-from-dropdown" class="w-full text-red-400 text-sm py-2 border border-red-400/30 rounded-xl mt-1">Logout</button>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto pb-24 px-4 pt-4 space-y-4" id="content-scroll">
+        <!-- HOME -->
+        <section id="section-home" class="content-section active space-y-4">
+          <div class="glass-card p-5 bg-gradient-to-br from-[#1a0a0a] to-[#111] border-red-500/20 animate-glow-pulse">
+            <p class="text-gray-400 text-xs uppercase tracking-wider">Wallet Balance</p>
+            <div class="flex items-baseline gap-1 mt-1">
+              <span class="text-3xl font-bold">₹</span>
+              <span id="balance-home" class="text-4xl font-extrabold">0</span>
+            </div>
+            <div class="flex gap-3 mt-4">
+              <button id="add-money-btn-home" class="btn-primary px-5 py-2 rounded-lg text-sm font-semibold flex-1">+ Add Money</button>
+              <button id="withdraw-btn-home" class="btn-outline px-5 py-2 rounded-lg text-sm font-semibold flex-1">Withdraw</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="glass-card p-4 text-center"><p class="text-gray-400 text-xs uppercase">Total Matches</p><p id="total-matches" class="text-2xl font-bold mt-1">0</p></div>
+            <div class="glass-card p-4 text-center"><p class="text-gray-400 text-xs uppercase">Wins</p><p id="total-wins" class="text-2xl font-bold text-green-badge mt-1">0</p></div>
+          </div>
+          <div id="live-banner" class="glass-card p-4 flex items-center gap-3 border-red-500/20 animate-glow-pulse cursor-pointer">
+            <span class="live-dot w-2 h-2 bg-primary rounded-full animate-pulse-slow"></span>
+            <div class="flex-1"><p class="font-semibold text-sm">Live Now</p><p id="live-banner-text" class="text-gray-400 text-xs">No live tournaments</p></div>
+            <span class="text-primary text-xs font-bold">WATCH →</span>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-3"><h3 class="font-semibold text-lg">Featured Tournaments</h3><button id="goto-tournaments-btn" class="text-primary text-sm font-medium">View All →</button></div>
+            <div id="featured-tournaments-container" class="space-y-3"></div>
+          </div>
+        </section>
+
+        <!-- TOURNAMENTS -->
+        <section id="section-tournaments" class="content-section space-y-3">
+          <h2 class="font-semibold text-lg mb-1">All Tournaments</h2>
+          <div id="all-tournaments-container" class="space-y-3"></div>
+          <div id="no-tournaments-msg" class="hidden text-center py-10 text-gray-500"><p class="text-4xl mb-3">🏆</p><p>No tournaments available right now.</p></div>
+        </section>
+
+        <!-- MY MATCHES -->
+        <section id="section-matches" class="content-section space-y-3">
+          <h2 class="font-semibold text-lg mb-1">My Matches</h2>
+          <div id="my-matches-container" class="space-y-3"></div>
+          <div id="no-matches-msg" class="hidden text-center py-10 text-gray-500"><p class="text-4xl mb-3">🎮</p><p>You haven't joined any matches yet.</p></div>
+        </section>
+
+        <!-- WALLET -->
+        <section id="section-wallet" class="content-section space-y-4">
+          <h2 class="font-semibold text-lg mb-1">Wallet</h2>
+          <div class="glass-card p-5 bg-gradient-to-br from-[#1a0a0a] to-[#111] border-red-500/20">
+            <p class="text-gray-400 text-xs uppercase">Available Balance</p>
+            <p class="text-4xl font-extrabold mt-1">₹<span id="wallet-balance">0</span></p>
+            <div class="flex gap-3 mt-4">
+              <button id="add-money-btn-wallet" class="btn-primary px-5 py-2.5 rounded-lg text-sm font-semibold flex-1">+ Add Money</button>
+              <button id="withdraw-btn-wallet" class="btn-outline px-5 py-2.5 rounded-lg text-sm font-semibold flex-1">Withdraw</button>
+            </div>
+          </div>
+          <div>
+            <h3 class="font-semibold text-sm mb-3">Transaction History</h3>
+            <div id="transaction-list" class="space-y-2"></div>
+            <div id="no-transactions-msg" class="hidden text-center py-6 text-gray-500"><p class="text-sm">No transactions yet.</p></div>
+          </div>
+        </section>
+
+        <!-- LEADERBOARD -->
+        <section id="section-leaderboard" class="content-section space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-lg">🏆 Global Leaderboard</h2>
+            <button id="refresh-leaderboard" class="text-primary text-xs bg-primary/10 px-3 py-1 rounded-full">Refresh</button>
+          </div>
+          <div class="glass-card overflow-hidden">
+            <div class="bg-[#0f0f0f] p-3 border-b border-white/10 flex text-xs font-semibold text-gray-400">
+              <div class="w-12">#</div>
+              <div class="flex-1">Player</div>
+              <div class="text-right">Total ₹ Won</div>
+            </div>
+            <div id="leaderboard-list" class="divide-y divide-white/5">
+              <div class="p-4 text-center text-gray-500">Loading champions...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- FAQ SECTION -->
+        <section id="section-faq" class="content-section space-y-5">
+          <div class="text-center space-y-1">
+            <h2 class="text-2xl font-bold tracking-tight text-white">Help & Support</h2>
+            <p class="text-gray-400 text-sm">Frequently Asked Questions</p>
+          </div>
+          <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" id="faq-search-input" placeholder="Search questions..." class="w-full bg-surface border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-white text-sm focus:border-primary focus:ring-1 focus:ring-primary/40 outline-none transition">
+          </div>
+          <div class="flex flex-wrap gap-2 pb-1 overflow-x-auto">
+            <button data-category="all" class="faq-category-btn active px-4 py-1.5 rounded-full text-xs font-medium bg-white/5 border border-white/10 hover:bg-primary/20 transition-all">All</button>
+            <button data-category="account" class="faq-category-btn px-4 py-1.5 rounded-full text-xs font-medium bg-white/5 border border-white/10 hover:bg-primary/20 transition-all">🔐 Account</button>
+            <button data-category="wallet" class="faq-category-btn px-4 py-1.5 rounded-full text-xs font-medium bg-white/5 border border-white/10 hover:bg-primary/20 transition-all">💳 Wallet</button>
+            <button data-category="tournaments" class="faq-category-btn px-4 py-1.5 rounded-full text-xs font-medium bg-white/5 border border-white/10 hover:bg-primary/20 transition-all">🏆 Tournaments</button>
+            <button data-category="referral" class="faq-category-btn px-4 py-1.5 rounded-full text-xs font-medium bg-white/5 border border-white/10 hover:bg-primary/20 transition-all">🤝 Referral</button>
+          </div>
+          <div id="faq-accordion-container" class="space-y-3"></div>
+          <div id="faq-no-results" class="hidden text-center py-12 glass-card rounded-2xl">
+            <p class="text-gray-400 text-sm">🔍 No matching questions found.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl mt-4 text-center border border-primary/20">
+            <p class="font-semibold text-white">🤔 Still have questions?</p>
+            <div class="flex gap-3 mt-4">
+              <button id="contact-support-btn-faq" class="btn-primary flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">📧 Telegram</button>
+              <button id="instagram-btn-faq" class="btn-outline flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069z"/></svg>
+                Instagram
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- BOTTOM NAV -->
+      <nav class="glass-subtle fixed bottom-0 left-0 right-0 z-50 border-t border-white/5 px-2 py-2 flex items-center justify-around md:max-w-[480px] md:mx-auto">
+        <div class="nav-item active flex flex-col items-center gap-1 px-3 py-1 relative" data-tab="home"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="text-[10px] font-medium">Home</span></div>
+        <div class="nav-item flex flex-col items-center gap-1 px-3 py-1 relative" data-tab="tournaments"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><span class="text-[10px] font-medium">Tournaments</span></div>
+        <div class="nav-item flex flex-col items-center gap-1 px-3 py-1 relative" data-tab="matches"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><circle cx="18" cy="4" r="2"/><circle cx="6" cy="4" r="2"/></svg><span class="text-[10px] font-medium">Matches</span></div>
+        <div class="nav-item flex flex-col items-center gap-1 px-3 py-1 relative" data-tab="wallet"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 10h-4a2 2 0 0 0 0 4h4"/><line x1="2" y1="10" x2="2" y2="14"/></svg><span class="text-[10px] font-medium">Wallet</span></div>
+        <div class="nav-item flex flex-col items-center gap-1 px-3 py-1 relative" data-tab="leaderboard"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 7.93l2.83 2.83M16.24 13.24l2.83 2.83M2 12h4M18 12h4M7.93 16.24l-2.83 2.83M13.24 7.93l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg><span class="text-[10px] font-medium">Leaderboard</span></div>
+        <div class="nav-item flex flex-col items-center gap-1 px-3 py-1 relative" data-tab="faq"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span class="text-[10px] font-medium">Support</span></div>
+      </nav>
+    </div>
+
+    <!-- MODALS -->
+    <div id="add-money-modal" class="modal-overlay"><div class="modal-content"><h3 class="font-semibold text-lg mb-4">Add Money</h3><div class="flex gap-2 mb-4 flex-wrap"><button class="quick-amount bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-2 text-white text-sm" data-amount="100">₹100</button><button class="quick-amount" data-amount="200">₹200</button><button class="quick-amount" data-amount="500">₹500</button><button class="quick-amount" data-amount="1000">₹1000</button></div><input type="number" id="add-money-amount" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none mb-4" placeholder="Enter amount" min="10"><button id="confirm-add-money" class="btn-primary w-full py-3 rounded-lg font-semibold text-sm">Proceed to Pay</button><button id="cancel-add-money" class="w-full py-2 mt-2 text-gray-500 text-sm">Cancel</button></div></div>
+    <div id="withdraw-modal" class="modal-overlay"><div class="modal-content"><h3 class="font-semibold text-lg mb-4">Withdraw Funds</h3><input type="number" id="withdraw-amount" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none mb-4" placeholder="Enter amount" min="50"><input type="text" id="withdraw-upi" class="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-primary outline-none mb-4" placeholder="Enter your UPI ID"><p class="text-gray-500 text-xs mb-3">Available: ₹<span id="withdraw-available">0</span></p><button id="confirm-withdraw" class="btn-primary w-full py-3 rounded-lg font-semibold text-sm">Withdraw</button><button id="cancel-withdraw" class="w-full py-2 mt-2 text-gray-500 text-sm">Cancel</button></div></div>
+  </div>
+
+  <script>
+    (function() {
+      const firebaseConfig = {
+        apiKey: "AIzaSyCYHlRvCnrZODM0IsYwnEK9qNGe_NuH7hg",
+        authDomain: "tournament-d2fe9.firebaseapp.com",
+        projectId: "tournament-d2fe9",
+        storageBucket: "tournament-d2fe9.firebasestorage.app",
+        messagingSenderId: "119791259711",
+        appId: "1:119791259711:web:0f010c21ba55ad427ea88a"
+      };
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+      db.settings({ merge: true });
+      
+      let currentUser = null, userData = null, activeTab = 'home', unsubscribeUser = null;
+      function showToast(msg, type='info'){ const c=document.getElementById('toast-container'); const t=document.createElement('div'); t.className=`toast toast-${type}`; t.textContent=msg; c.appendChild(t); setTimeout(()=>{ t.remove(); },2800); }
+      function formatCurrency(amt){ return Number(amt).toLocaleString('en-IN'); }
+      function generateReferralCode(uid){ return uid.substring(0,8).toUpperCase(); }
+      
+      async function updateReferralUI(uid){
+        if(!uid) return;
+        const doc = await db.collection('users').doc(uid).get();
+        if(!doc.exists) return;
+        const data = doc.data();
+        document.getElementById('total-referrals-count').innerText = data.referralsCount || 0;
+        document.getElementById('referral-earnings').innerText = formatCurrency(data.referralEarnings || 0);
+        let code = data.referralCode;
+        if(!code){ code = generateReferralCode(uid); await db.collection('users').doc(uid).update({ referralCode: code }); }
+        document.getElementById('referral-code-display').innerText = code;
+        if(data.bgmiUserId) document.getElementById('profile-bgmi-id').innerText = `BGMI: ${data.bgmiUserId}`;
+      }
+      
+      window.shareOnWhatsApp = () => {
+        const codeElem = document.getElementById('referral-code-display');
+        if(!codeElem || !currentUser) { showToast("Login to invite friends", "error"); return; }
+        const referralCode = codeElem.innerText;
+        const message = `🎮 Join me on Prixmi Esports! Use referral code ${referralCode} to get started.`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+      };
+      async function copyReferralCode() {
+        const codeSpan = document.getElementById('referral-code-display');
+        const code = codeSpan.innerText;
+        if(!code || code === 'XXXXX') { showToast("Referral code not ready", "error"); return; }
+        try { await navigator.clipboard.writeText(code); showToast(`✅ Referral code ${code} copied!`, "success"); } catch { showToast(`📋 Copied: ${code}`, "success"); }
+      }
+      
+      async function signupWithReferral(email, password, bgmiUserId, referralInput){
+        if(!bgmiUserId || bgmiUserId.trim() === ""){ showToast("BGMI User ID is required", "error"); return null; }
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        const uid = cred.user.uid;
+        let referredByUid = null;
+        if(referralInput && referralInput.trim() !== ""){
+          const code = referralInput.trim().toUpperCase();
+          const usersSnap = await db.collection('users').where('referralCode', '==', code).limit(1).get();
+          if(!usersSnap.empty) referredByUid = usersSnap.docs[0].id;
+          else showToast("Invalid referral code, continuing without referral", "info");
+        }
+        await db.collection('users').doc(uid).set({
+          email: email, bgmiUserId: bgmiUserId.trim(), balance: 0, totalWinnings: 0,
+          referralCode: generateReferralCode(uid), referredBy: referredByUid || null,
+          referralsCount: 0, referralEarnings: 0, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        if(referredByUid){
+          const referrerRef = db.collection('users').doc(referredByUid);
+          await db.runTransaction(async (t) => {
+            const refDoc = await t.get(referrerRef);
+            const prevCount = refDoc.data()?.referralsCount || 0, prevEarn = refDoc.data()?.referralEarnings || 0, prevBal = refDoc.data()?.balance || 0;
+            const bonus = 50;
+            t.update(referrerRef, { referralsCount: prevCount + 1, referralEarnings: prevEarn + bonus, balance: prevBal + bonus });
+            t.set(referrerRef.collection('transactions').doc(), { amount: bonus, type: 'referral_bonus', description: `Referral bonus for inviting ${email}`, balanceAfter: prevBal + bonus, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+          });
+          showToast(`🎉 You earned ₹50 referral bonus!`, "success");
+        }
+        showToast(`✅ Account created with BGMI ID: ${bgmiUserId}`, "success");
+        return cred.user;
+      }
+      
+      // Separate Signup Handler
+      document.getElementById('signup-submit-btn').onclick = async () => {
+        const email = document.getElementById('signup-email').value.trim();
+        const pwd = document.getElementById('signup-password').value;
+        const bgmiId = document.getElementById('signup-bgmi-id').value.trim();
+        const ref = document.getElementById('signup-referral').value.trim();
+        if(!email || !pwd) return showToast("Email & password required", "error");
+        if(pwd.length < 6) return showToast("Password must be at least 6 characters", "error");
+        if(!bgmiId) return showToast("BGMI User ID is required for signup", "error");
+        try{ await signupWithReferral(email, pwd, bgmiId, ref); } catch(e){ showToast(e.message, "error"); }
+      };
+      
+      // Separate Login Handler
+      document.getElementById('login-submit-btn').onclick = async () => {
+        const email = document.getElementById('login-email').value.trim();
+        const pwd = document.getElementById('login-password').value;
+        if(!email || !pwd) return showToast("Email and password required", "error");
+        try{ await auth.signInWithEmailAndPassword(email, pwd); } catch(e){ showToast("Login failed: Invalid credentials", "error"); }
+      };
+      
+      // Tab Switching between Signup and Login
+      const signupTab = document.getElementById('auth-signup-tab');
+      const loginTab = document.getElementById('auth-login-tab');
+      const signupForm = document.getElementById('signup-form-container');
+      const loginForm = document.getElementById('login-form-container');
+      const switchToSignup = document.getElementById('switch-to-signup');
+      
+      signupTab.onclick = () => {
+        signupTab.classList.add('active', 'bg-primary', 'text-white');
+        loginTab.classList.remove('active', 'bg-primary', 'text-white');
+        loginTab.classList.add('text-gray-400');
+        signupForm.classList.remove('hidden');
+        loginForm.classList.add('hidden');
+        document.getElementById('auth-error').classList.add('hidden');
+      };
+      loginTab.onclick = () => {
+        loginTab.classList.add('active', 'bg-primary', 'text-white');
+        signupTab.classList.remove('active', 'bg-primary', 'text-white');
+        signupTab.classList.add('text-gray-400');
+        loginForm.classList.remove('hidden');
+        signupForm.classList.add('hidden');
+        document.getElementById('auth-error').classList.add('hidden');
+      };
+      if(switchToSignup) switchToSignup.onclick = () => signupTab.click();
+      
+      function updateBalanceDisplays(balance){ const bal=formatCurrency(balance||0); ['balance-display-top','balance-home','wallet-balance'].forEach(id=>{ let el=document.getElementById(id); if(el) el.textContent=bal; }); let wa=document.getElementById('withdraw-available'); if(wa) wa.textContent=bal; }
+      async function loadHome(){ document.getElementById('total-matches').innerText = '0'; document.getElementById('total-wins').innerText = '0'; }
+      async function loadLeaderboard(){ const container=document.getElementById('leaderboard-list'); container.innerHTML='<div class="p-4 text-center">Loading...</div>'; try{ const snap=await db.collection('users').orderBy('totalWinnings','desc').limit(30).get(); if(snap.empty) container.innerHTML='<div class="p-6 text-center text-gray-500">🏅 No players yet.</div>'; else { let rank=1; let html=''; snap.forEach(doc=>{ const data=doc.data(); html+=`<div class="flex justify-between p-3"><span>${rank}. ${data.email?.split('@')[0]||'Player'}</span><span class="text-primary">₹${formatCurrency(data.totalWinnings||0)}</span></div>`; rank++; }); container.innerHTML=html; } } catch(e){ container.innerHTML='<div class="p-4 text-red-400">Error</div>'; } }
+      function refreshTab(tab){ if(tab==='home') loadHome(); else if(tab==='leaderboard') loadLeaderboard(); else if(tab==='wallet') updateBalanceDisplays(userData?.balance||0); }
+      function switchTab(tab){ activeTab=tab; document.querySelectorAll('.content-section').forEach(s=>s.classList.remove('active')); document.getElementById(`section-${tab}`).classList.add('active'); document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); document.querySelector(`.nav-item[data-tab="${tab}"]`).classList.add('active'); refreshTab(tab); }
+      document.getElementById('profile-btn')?.addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('profile-dropdown').classList.toggle('show'); });
+      document.getElementById('copy-referral-code-btn')?.addEventListener('click', copyReferralCode);
+      document.getElementById('whatsapp-invite-btn')?.addEventListener('click', shareOnWhatsApp);
+      document.getElementById('logout-from-dropdown')?.addEventListener('click', () => auth.signOut());
+      document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>switchTab(n.dataset.tab)));
+      document.getElementById('goto-tournaments-btn')?.addEventListener('click',()=>switchTab('tournaments'));
+      document.getElementById('refresh-leaderboard')?.addEventListener('click',()=>loadLeaderboard());
+      document.getElementById('live-banner')?.addEventListener('click',()=>switchTab('tournaments'));
+      
+      function openTelegramSupport() { window.open('https://t.me/Prixmi', '_blank'); showToast("🔗 Opening Telegram", "info"); }
+      function openInstagram() { window.open('https://www.instagram.com/prixm_i?igsh=MW5jMTM2OHg3ZzN6OQ==', '_blank'); showToast("📸 Opening Instagram", "success"); }
+      document.getElementById('contact-support-btn-faq')?.addEventListener('click', openTelegramSupport);
+      document.getElementById('instagram-btn-faq')?.addEventListener('click', openInstagram);
+      
+      document.addEventListener('click', (e) => { if(!e.target.closest('#profile-btn') && !e.target.closest('#profile-dropdown')) document.getElementById('profile-dropdown')?.classList.remove('show'); });
+      
+      auth.onAuthStateChanged(async(user) => {
+        if(unsubscribeUser) unsubscribeUser();
+        if(user){
+          currentUser = user;
+          const userRef = db.collection('users').doc(user.uid);
+          const docSnap = await userRef.get();
+          if(!docSnap.exists){
+            showToast("Please complete signup with BGMI ID", "info");
+            await auth.signOut();
+            return;
+          }
+          userData = docSnap.data();
+          document.getElementById('auth-screen').classList.add('hidden');
+          document.getElementById('main-app').classList.remove('hidden');
+          document.getElementById('profile-email').innerText = user.email || '';
+          document.getElementById('dropdown-avatar').innerText = (user.email?.charAt(0) || 'U').toUpperCase();
+          if(userData.bgmiUserId) document.getElementById('profile-bgmi-id').innerText = `BGMI: ${userData.bgmiUserId}`;
+          await updateReferralUI(user.uid);
+          unsubscribeUser = userRef.onSnapshot(snap => { if(snap.exists){ userData=snap.data(); updateBalanceDisplays(userData.balance); updateReferralUI(user.uid); } });
+          updateBalanceDisplays(userData.balance);
+          loadHome(); switchTab('home');
+        } else {
+          document.getElementById('auth-screen').classList.remove('hidden');
+          document.getElementById('main-app').classList.add('hidden');
+          currentUser = null;
+          signupTab.click(); // reset to signup tab
+        }
+      });
+      
+// --- CASHFREE REAL GATEWAY START ---
+document.getElementById('confirm-add-money')?.addEventListener('click', async () => {
+    const amountInput = document.getElementById('add-money-amount');
+    const confirmBtn = document.getElementById('confirm-add-money');
+    const amount = parseInt(amountInput.value);
+
+    // 1. Amount Check
+    if (!amount || amount < 10) return showToast("Enter valid amount (min ₹10)", "error");
+
+    // 2. User Login Check (Error se bachne ke liye)
+    if (!currentUser) return showToast("Please login first!", "error");
+
+    // 3. Cashfree SDK Load Check
+    if (typeof window.Cashfree === 'undefined') {
+        return showToast("Cashfree loading error. Please refresh page.", "error");
+    }
+
+    try {
+        confirmBtn.innerText = "Processing...";
+        confirmBtn.disabled = true;
+
+        // Ab initialize karein
+        const cashfree = window.Cashfree({ mode: "sandbox" }); 
+
+        //Backend ko request bhejein
+        const response = await fetch(`https://prixmi-backend.vercel.app
+        /api/create-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                customer_id: currentUser.uid,
+                customer_email: currentUser.email || 'user@example.com',
+                customer_phone: "9999999999",
+                order_amount: amount
+            })
+        });
+
+        // 🛠 FIX: Agar Backend error de toh script crash na ho
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            console.error("Backend Error Response:", responseText);
+            throw new Error("Backend issue: Server API is not returning proper JSON.");
+        }
+
+        if (data && data.payment_session_id) {
+            document.getElementById('add-money-modal').classList.remove('show');
+            
+            cashfree.checkout({
+                paymentSessionId: data.payment_session_id,
+                redirectTarget: "_modal"
+            }).then(async (result) => {
+                if (result.error) {
+                    showToast(result.error.message || "Payment Cancelled", "error");
+                }
+                if (result.paymentDetails) {
+                    showToast("Payment Successful!", "success");
+                    const userRef = db.collection('users').doc(currentUser.uid);
+                    await userRef.update({ 
+                        balance: firebase.firestore.FieldValue.increment(amount),
+                        totalAdded: firebase.firestore.FieldValue.increment(amount)
+                    });
+                }
+            });
+        } else {
+            throw new Error(data.message || "Backend Server error: Session ID missing");
+        }
+    } catch (error) {
+        console.error("Gateway Full Error:", error);
+        // Ab error toast mein exact batayega ki problem kahan aayi hai
+        showToast("Error: " + (error.message || "Gateway Issue"), "error"); 
+    } finally {
+        confirmBtn.innerText = "Proceed to Pay";
+        confirmBtn.disabled = false;
+    }
+});
+// --- CASHFREE REAL GATEWAY END --
+      document.getElementById('cancel-add-money')?.addEventListener('click',()=>document.getElementById('add-money-modal').classList.remove('show'));
+      document.getElementById('add-money-btn-home')?.addEventListener('click',()=>document.getElementById('add-money-modal').classList.add('show'));
+      document.getElementById('add-money-btn-wallet')?.addEventListener('click',()=>document.getElementById('add-money-modal').classList.add('show'));
+      document.getElementById('withdraw-btn-home')?.addEventListener('click',()=>document.getElementById('withdraw-modal').classList.add('show'));
+      document.getElementById('withdraw-btn-wallet')?.addEventListener('click',()=>document.getElementById('withdraw-modal').classList.add('show'));
+      document.getElementById('confirm-withdraw')?.addEventListener('click',()=>{ showToast("Withdraw requested","success"); document.getElementById('withdraw-modal').classList.remove('show'); });
+      document.getElementById('cancel-withdraw')?.addEventListener('click',()=>document.getElementById('withdraw-modal').classList.remove('show'));
+      document.querySelectorAll('.quick-amount').forEach(btn=>btn.addEventListener('click',()=>{ document.getElementById('add-money-amount').value=btn.dataset.amount; }));
+      
+      // FAQ Data
+      const faqData = [
+        { category: "account", q: "How do I create an account?", a: "Go to Sign Up tab, enter email, password, and your BGMI User ID. Optional referral code gives ₹50 bonus." },
+        { category: "account", q: "Why do I need BGMI User ID?", a: "BGMI ID is required to verify your identity for tournament participation and prize distribution." },
+        { category: "wallet", q: "How do I add money to my wallet?", a: "Go to Wallet section or Home, tap 'Add Money', choose amount and complete payment via Cashfree." },
+        { category: "tournaments", q: "How can I join a tournament?", a: "Browse tournaments under 'Tournaments' tab, tap on any match, confirm entry fee and join." },
+        { category: "wallet", q: "What is the minimum withdrawal amount?", a: "Minimum withdrawal amount is ₹50." },
+        { category: "referral", q: "How does the referral system work?", a: "Share your unique referral code. Each friend who signs up gives you ₹50 bonus." }
+      ];
+      
+      function renderFAQ(categoryFilter = "all", searchTerm = "") {
+        const container = document.getElementById('faq-accordion-container');
+        const noResultsDiv = document.getElementById('faq-no-results');
+        let filtered = faqData.filter(item => categoryFilter === "all" || item.category === categoryFilter);
+        if(searchTerm.trim() !== "") {
+          const lowerSearch = searchTerm.toLowerCase();
+          filtered = filtered.filter(item => item.q.toLowerCase().includes(lowerSearch) || item.a.toLowerCase().includes(lowerSearch));
+        }
+        if(filtered.length === 0) { container.innerHTML = ''; noResultsDiv.classList.remove('hidden'); return; }
+        noResultsDiv.classList.add('hidden');
+        container.innerHTML = filtered.map((item, idx) => `
+          <div class="faq-item glass-card rounded-xl overflow-hidden border border-white/5 transition-all" data-faq-idx="${idx}">
+            <div class="faq-question p-4 flex justify-between items-center cursor-pointer">
+              <div class="flex items-start gap-3">
+                <span class="text-primary text-lg">${item.category === "account" ? "🔐" : item.category === "wallet" ? "💳" : item.category === "tournaments" ? "🏆" : "🤝"}</span>
+                <p class="text-sm font-medium text-white pr-4">${item.q}</p>
+              </div>
+              <svg class="faq-icon w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+            <div class="faq-answer px-4 pb-4 text-gray-300 text-sm leading-relaxed border-t border-white/5 pt-3">${item.a}</div>
+          </div>
+        `).join('');
+        attachFAQEvents();
+      }
+      function attachFAQEvents() {
+        document.querySelectorAll('.faq-item').forEach(item => {
+          const questionDiv = item.querySelector('.faq-question');
+          const answerDiv = item.querySelector('.faq-answer');
+          questionDiv?.addEventListener('click', () => {
+            const isActive = item.classList.contains('active');
+            document.querySelectorAll('.faq-item').forEach(i => { i.classList.remove('active'); const ans = i.querySelector('.faq-answer'); if(ans) ans.classList.remove('open'); });
+            if(!isActive) { item.classList.add('active'); if(answerDiv) answerDiv.classList.add('open'); }
+          });
+        });
+      }
+      let currentCategory = "all", currentSearch = "";
+      document.querySelectorAll('.faq-category-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.faq-category-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentCategory = btn.dataset.category;
+          renderFAQ(currentCategory, currentSearch);
+        });
+      });
+      document.getElementById('faq-search-input')?.addEventListener('input', (e) => { currentSearch = e.target.value; renderFAQ(currentCategory, currentSearch); });
+      renderFAQ('all', '');
+    })();
+  </script>
+</body>
+</html>
