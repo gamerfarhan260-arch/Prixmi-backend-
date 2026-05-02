@@ -97,11 +97,9 @@ cron.schedule('* * * * *', async () => {
 
 // --- API ROUTES ---
 
-// 1. CASHFREE ORDER CREATE (Yahan fix kiya gaya hai!)
-// Route ka naam ab wahi hai jo frontend bhej raha hai: '/api/create-order'
+// 1. CASHFREE ORDER CREATE
 app.post('/api/create-order', async (req, res) => {
     try {
-        // Frontend se bheja gaya data
         const { customer_id, customer_email, customer_phone, order_amount } = req.body;
         
         if (!customer_id || !order_amount) {
@@ -141,11 +139,72 @@ app.post('/api/create-order', async (req, res) => {
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // Frontend ko JSON mein payment_session_id bhej dega
         res.json({ payment_session_id: cfRes.data.payment_session_id, order_id: orderId });
     } catch (e) { 
         console.error("Cashfree API Error:", e.response?.data || e.message);
         res.status(500).json({ error: "Failed to create Cashfree Order" }); 
+    }
+});
+
+// 2. CASHFREE ORDER VERIFICATION & BALANCE UPDATE (Naya Logic)
+app.post('/api/verify-order', async (req, res) => {
+    try {
+        const { order_id } = req.body;
+        if (!order_id) return res.status(400).json({ error: "Missing order_id" });
+
+        // Cashfree API se exact order status fetch karo
+        const cfRes = await axios.get(`${CASHFREE_URL}/orders/${order_id}`, {
+            headers: {
+                'x-client-id': process.env.CASHFREE_APP_ID,
+                'x-client-secret': process.env.CASHFREE_SECRET_KEY,
+                'x-api-version': '2022-09-01'
+            }
+        });
+
+        const orderData = cfRes.data;
+
+        // Check karo agar payment sach me PAID hai
+        if (orderData.order_status === 'PAID') {
+            
+            // Firebase me transaction dhoondho
+            const txnsRef = db.collection('transactions');
+            const snapshot = await txnsRef.where('orderId', '==', order_id).get();
+
+            if (snapshot.empty) {
+                return res.status(404).json({ error: "Transaction record not found" });
+            }
+
+            const txnDoc = snapshot.docs[0];
+            const txnData = txnDoc.data();
+
+            // DOUBLE DEPOSIT GUARD: Agar pehle hi success ho chuka hai toh wapas add mat karo
+            if (txnData.status === 'SUCCESS') {
+                return res.json({ success: true, message: "Already verified and added" });
+            }
+
+            // Safely Update Transaction & User Wallet Balance
+            const userId = txnData.userId;
+            const amount = txnData.amount;
+
+            const batch = db.batch();
+            
+            // Transaction ko SUCCESS mark karo
+            batch.update(txnDoc.ref, { status: 'SUCCESS' });
+            
+            // User ke balance me amount add karo (Admin SDK ke through)
+            const userRef = db.collection('users').doc(userId);
+            batch.update(userRef, { balance: admin.firestore.FieldValue.increment(amount) });
+
+            await batch.commit();
+
+            return res.json({ success: true, message: "Payment Verified & Wallet Updated!" });
+        } else {
+            return res.status(400).json({ success: false, message: "Payment not complete yet", status: orderData.order_status });
+        }
+
+    } catch (error) {
+        console.error("Verification Error:", error.response?.data || error.message);
+        res.status(500).json({ error: "Verification Failed internally" });
     }
 });
 
